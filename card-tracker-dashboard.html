@@ -145,23 +145,35 @@
                 ]
             };
 
-            const generateChartData = (market) => {
+            // Seeded pseudo-random so chart data is stable for a given market+timeframe
+            const seededRng = (seed) => {
+                let s = seed;
+                return () => {
+                    s = (s * 1664525 + 1013904223) & 0xffffffff;
+                    return (s >>> 0) / 0xffffffff;
+                };
+            };
+
+            const chartData = React.useMemo(() => {
                 const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
                 const data = [];
                 const basePrice = { pokemon: 450, yugioh: 320, onepiece: 280, mtg: 380, mlb: 520, nba: 480, nfl: 650, nhl: 410 };
-                const base = basePrice[market] || 400;
-                
+                const base = basePrice[selectedMarket] || 400;
+                // Use a deterministic seed derived from market + timeframe so the
+                // chart is stable while the same market/timeframe is displayed.
+                const marketSeed = selectedMarket.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+                const rng = seededRng(marketSeed * days);
                 for (let i = -days; i <= 0; i++) {
-                    const volatility = Math.sin(i / 10) * 20 + (Math.random() - 0.5) * 40;
+                    const volatility = Math.sin(i / 10) * 20 + (rng() - 0.5) * 40;
                     data.push({
                         date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                         price: Math.round(base + volatility),
-                        volume: Math.floor(1200 + Math.random() * 2800),
-                        graded: Math.floor(300 + Math.random() * 800)
+                        volume: Math.floor(1200 + rng() * 2800),
+                        graded: Math.floor(300 + rng() * 800)
                     });
                 }
                 return data;
-            };
+            }, [selectedMarket, timeframe]);
 
             const portfolioData = [
                 { market: 'pokemon', cards: 145, value: 68420, change: 12.4, topCard: 'Charizard PSA 9' },
@@ -174,7 +186,6 @@
             const portfolioChange = ((portfolioData.reduce((sum, item) => sum + (item.value * item.change / 100), 0)) / totalPortfolioValue * 100).toFixed(1);
 
             const marketData = [...markets.sports, ...markets.tcg].find(m => m.id === selectedMarket);
-            const chartData = generateChartData(selectedMarket);
             const marketMetrics = {
                 avgPrice: Math.round(chartData.reduce((sum, d) => sum + d.price, 0) / chartData.length),
                 highPrice: Math.max(...chartData.map(d => d.price)),
@@ -189,6 +200,41 @@
                 { name: 'MTG', value: 45230, pct: 17 },
                 { name: 'Other TCG', value: 28640, pct: 12 }
             ];
+
+            // Compute market volatility (coefficient of variation) from chart data
+            const priceMean = chartData.reduce((sum, d) => sum + d.price, 0) / chartData.length;
+            const priceVariance = chartData.reduce((sum, d) => sum + Math.pow(d.price - priceMean, 2), 0) / chartData.length;
+            const computedVolatility = (Math.sqrt(priceVariance) / priceMean * 100).toFixed(1);
+
+            // Build SVG paths for charts
+            const svgXL = 45, svgXR = 790, svgYT = 15, svgYB = 225;
+            const buildPricePath = (data, key) => {
+                const vals = data.map(d => d[key]);
+                const minV = Math.min(...vals), maxV = Math.max(...vals);
+                const pad = (maxV - minV) * 0.1 || 5;
+                const lo = minV - pad, hi = maxV + pad, rangeV = hi - lo;
+                const pts = data.map((d, i) => ({
+                    x: svgXL + (i / (data.length - 1)) * (svgXR - svgXL),
+                    y: svgYB - ((d[key] - lo) / rangeV) * (svgYB - svgYT),
+                    val: d[key], date: d.date
+                }));
+                const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                const area = line + ` L ${pts[pts.length - 1].x.toFixed(1)},${svgYB} L ${pts[0].x.toFixed(1)},${svgYB} Z`;
+                const yLabels = [0, 0.25, 0.5, 0.75, 1].map(pct => ({
+                    val: Math.round(lo + pct * rangeV), y: svgYB - pct * (svgYB - svgYT)
+                }));
+                return { pts, line, area, yLabels };
+            };
+
+            const priceChart = buildPricePath(chartData, 'price');
+            const gradedChart = buildPricePath(chartData, 'graded');
+            const maxVol = Math.max(...chartData.map(d => d.volume));
+            const dateStep = Math.max(1, Math.floor((chartData.length - 1) / 5));
+
+            // Dynamic alerts derived from actual market data
+            const allMarkets = [...markets.sports, ...markets.tcg];
+            const topVolatileMarket = allMarkets.reduce((a, b) => Math.abs(b.trend) > Math.abs(a.trend) ? b : a);
+            const bestPerformer = allMarkets.reduce((a, b) => b.trend > a.trend ? b : a);
 
             return e('div', { className: 'min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' },
                 // Header
@@ -246,8 +292,8 @@
                         ),
                         e('div', { className: 'metric-card' },
                             e('h3', { className: 'text-slate-400 text-sm font-semibold mb-2' }, 'Market Volatility'),
-                            e('p', { className: 'text-3xl font-bold text-white' }, '7.2%'),
-                            e('p', { className: 'text-xs text-slate-400 mt-1' }, '30-day average')
+                            e('p', { className: 'text-3xl font-bold text-white' }, `${computedVolatility}%`),
+                            e('p', { className: 'text-xs text-slate-400 mt-1' }, `${timeframe} average`)
                         )
                     ),
 
@@ -325,39 +371,69 @@
 
                         // Price Chart
                         e('div', { className: 'chart-container mb-6' },
-                            e('h3', { className: 'text-white font-semibold mb-4' }, 'Price Trend & Market Data'),
-                            e('div', { className: 'space-y-4' },
-                                e('div', null,
-                                    e('p', { className: 'text-slate-300 text-xs font-semibold mb-3' }, 'Price Movement'),
-                                    e('svg', { className: 'w-full h-64', viewBox: '0 0 800 300' },
-                                        // Simple line chart
-                                        e('defs', null,
-                                            e('linearGradient', { id: 'priceGradient', x1: '0%', y1: '0%', x2: '0%', y2: '100%' },
-                                                e('stop', { offset: '0%', stopColor: marketData.color, stopOpacity: 0.3 }),
-                                                e('stop', { offset: '100%', stopColor: marketData.color, stopOpacity: 0 })
-                                            )
-                                        ),
-                                        e('rect', { x: 0, y: 0, width: 800, height: 300, fill: 'transparent' }),
-                                        // Grid lines
-                                        e('line', { x1: 0, y1: 75, x2: 800, y2: 75, stroke: '#334155', strokeDasharray: '4' }),
-                                        e('line', { x1: 0, y1: 150, x2: 800, y2: 150, stroke: '#334155', strokeDasharray: '4' }),
-                                        e('line', { x1: 0, y1: 225, x2: 800, y2: 225, stroke: '#334155', strokeDasharray: '4' }),
-                                        // Price curve (simplified bezier path)
-                                        e('path', {
-                                            d: 'M 0 150 Q 100 140 200 145 T 400 135 T 600 140 T 800 120',
-                                            stroke: marketData.color,
-                                            strokeWidth: 3,
-                                            fill: 'none'
-                                        }),
-                                        // Gradient fill
-                                        e('path', {
-                                            d: 'M 0 150 Q 100 140 200 145 T 400 135 T 600 140 T 800 120 L 800 300 L 0 300 Z',
-                                            fill: 'url(#priceGradient)'
-                                        }),
-                                        // Axes
-                                        e('line', { x1: 0, y1: 250, x2: 800, y2: 250, stroke: '#475569', strokeWidth: 2 }),
-                                        e('line', { x1: 0, y1: 0, x2: 0, y2: 250, stroke: '#475569', strokeWidth: 2 })
+                            e('h3', { className: 'text-white font-semibold mb-4' }, 'Price Trend'),
+                            e('svg', { className: 'w-full', viewBox: '0 0 835 255', style: { height: '220px' } },
+                                e('defs', null,
+                                    e('linearGradient', { id: 'priceGradient', x1: '0%', y1: '0%', x2: '0%', y2: '100%' },
+                                        e('stop', { offset: '0%', stopColor: marketData.color, stopOpacity: 0.3 }),
+                                        e('stop', { offset: '100%', stopColor: marketData.color, stopOpacity: 0 })
                                     )
+                                ),
+                                // Grid lines
+                                priceChart.yLabels.map((lbl, i) =>
+                                    e('g', { key: i },
+                                        e('line', { x1: svgXL, y1: lbl.y.toFixed(1), x2: svgXR, y2: lbl.y.toFixed(1), stroke: '#334155', strokeDasharray: '4' }),
+                                        e('text', { x: svgXL - 5, y: (lbl.y + 4).toFixed(1), fill: '#94A3B8', fontSize: 10, textAnchor: 'end' }, `$${lbl.val}`)
+                                    )
+                                ),
+                                // X axis date labels
+                                chartData.map((d, i) => {
+                                    if (i % dateStep !== 0 && i !== chartData.length - 1) return null;
+                                    const x = svgXL + (i / (chartData.length - 1)) * (svgXR - svgXL);
+                                    return e('text', { key: i, x: x.toFixed(1), y: svgYB + 18, fill: '#94A3B8', fontSize: 10, textAnchor: 'middle' }, d.date);
+                                }),
+                                // Area fill
+                                e('path', { d: priceChart.area, fill: 'url(#priceGradient)' }),
+                                // Price line
+                                e('path', { d: priceChart.line, stroke: marketData.color, strokeWidth: 2.5, fill: 'none' }),
+                                // Axes
+                                e('line', { x1: svgXL, y1: svgYB, x2: svgXR, y2: svgYB, stroke: '#475569', strokeWidth: 1.5 }),
+                                e('line', { x1: svgXL, y1: svgYT, x2: svgXL, y2: svgYB, stroke: '#475569', strokeWidth: 1.5 })
+                            )
+                        ),
+
+                        // Volume and Graded Cards
+                        e('div', { className: 'grid grid-cols-2 gap-4' },
+                            e('div', { className: 'chart-container' },
+                                e('h3', { className: 'text-white font-semibold mb-4' }, 'Trading Volume'),
+                                e('svg', { className: 'w-full', viewBox: '0 0 835 200', style: { height: '160px' } },
+                                    chartData.map((d, i) => {
+                                        const barW = Math.max(2, (svgXR - svgXL) / chartData.length * 0.75);
+                                        const x = svgXL + (i / (chartData.length - 1)) * (svgXR - svgXL);
+                                        const h = (d.volume / maxVol) * (svgYB - svgYT - 5);
+                                        return e('rect', {
+                                            key: i, x: (x - barW / 2).toFixed(1), y: (svgYB - h).toFixed(1),
+                                            width: barW.toFixed(1), height: h.toFixed(1),
+                                            fill: marketData.color, opacity: 0.7
+                                        });
+                                    }),
+                                    e('line', { x1: svgXL, y1: svgYB, x2: svgXR, y2: svgYB, stroke: '#475569', strokeWidth: 1.5 }),
+                                    e('line', { x1: svgXL, y1: svgYT, x2: svgXL, y2: svgYB, stroke: '#475569', strokeWidth: 1.5 })
+                                )
+                            ),
+                            e('div', { className: 'chart-container' },
+                                e('h3', { className: 'text-white font-semibold mb-4' }, 'Graded Cards Listed'),
+                                e('svg', { className: 'w-full', viewBox: '0 0 835 200', style: { height: '160px' } },
+                                    e('defs', null,
+                                        e('linearGradient', { id: 'gradedGradient', x1: '0%', y1: '0%', x2: '0%', y2: '100%' },
+                                            e('stop', { offset: '0%', stopColor: marketData.color, stopOpacity: 0.15 }),
+                                            e('stop', { offset: '100%', stopColor: marketData.color, stopOpacity: 0 })
+                                        )
+                                    ),
+                                    e('path', { d: gradedChart.area, fill: 'url(#gradedGradient)' }),
+                                    e('path', { d: gradedChart.line, stroke: marketData.color, strokeWidth: 2, fill: 'none' }),
+                                    e('line', { x1: svgXL, y1: svgYB, x2: svgXR, y2: svgYB, stroke: '#475569', strokeWidth: 1.5 }),
+                                    e('line', { x1: svgXL, y1: svgYT, x2: svgXL, y2: svgYB, stroke: '#475569', strokeWidth: 1.5 })
                                 )
                             )
                         )
@@ -423,15 +499,21 @@
                         e('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4' },
                             e('div', { className: 'alert-box alert-amber' },
                                 e('p', { className: 'text-amber-200 text-sm font-semibold mb-1' }, '⚡ High Volatility Detected'),
-                                e('p', { className: 'text-amber-100 text-xs' }, 'One Piece market showing 15.8% growth - monitor for pullback.')
+                                e('p', { className: 'text-amber-100 text-xs' },
+                                    `${topVolatileMarket.name} market showing ${topVolatileMarket.trend > 0 ? '+' : ''}${topVolatileMarket.trend}% trend — monitor closely.`
+                                )
                             ),
                             e('div', { className: 'alert-box alert-green' },
                                 e('p', { className: 'text-green-200 text-sm font-semibold mb-1' }, '✓ Strong Performer'),
-                                e('p', { className: 'text-green-100 text-xs' }, 'NFL Football cards trending +8.3% with stable graded volume.')
+                                e('p', { className: 'text-green-100 text-xs' },
+                                    `${bestPerformer.name} is the top-trending market at +${bestPerformer.trend}% over the selected period.`
+                                )
                             ),
                             e('div', { className: 'alert-box alert-blue' },
-                                e('p', { className: 'text-blue-200 text-sm font-semibold mb-1' }, 'ℹ Data Update'),
-                                e('p', { className: 'text-blue-100 text-xs' }, 'Daily feeds updated 15 min ago. Next update: 4:00 PM EST.')
+                                e('p', { className: 'text-blue-200 text-sm font-semibold mb-1' }, 'ℹ Last Updated'),
+                                e('p', { className: 'text-blue-100 text-xs' },
+                                    `Data last refreshed at ${lastUpdate.toLocaleTimeString()}. Page auto-refreshes the timestamp every minute.`
+                                )
                             )
                         )
                     )

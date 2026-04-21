@@ -1,28 +1,71 @@
 from __future__ import annotations
 
 import os
-import random
+
+import requests
+from requests_oauthlib import OAuth1
 
 from scrapers.base import BaseScraper
 from utils.models import Listing
+
+_CM_API_BASE = "https://api.cardmarket.com/ws/v2.0/output.json"
 
 
 class CardMarketScraper(BaseScraper):
     source = "cardmarket"
 
     def __init__(self) -> None:
-        self.token = os.getenv("CARDMARKET_APP_TOKEN", "")
+        self.app_token = os.getenv("CARDMARKET_APP_TOKEN", "")
+        self.app_secret = os.getenv("CARDMARKET_APP_SECRET", "")
+        self.access_token = os.getenv("CARDMARKET_ACCESS_TOKEN", "")
+        self.access_token_secret = os.getenv("CARDMARKET_ACCESS_TOKEN_SECRET", "")
 
     def fetch(self, card_name: str) -> list[Listing]:
-        return [
-            Listing(
-                source=self.source,
-                card_name=card_name,
-                price=round(random.uniform(15, 350), 2),
-                currency="EUR",
-                listing_id=f"{card_name}-cm-{idx}",
-                listing_url="https://www.cardmarket.com/",
-                sold_count=random.randint(1, 40),
+        if not all(
+            [
+                self.app_token,
+                self.app_secret,
+                self.access_token,
+                self.access_token_secret,
+            ]
+        ):
+            raise RuntimeError(
+                "CardMarket OAuth credentials are not fully set "
+                "(CARDMARKET_APP_TOKEN, CARDMARKET_APP_SECRET, "
+                "CARDMARKET_ACCESS_TOKEN, CARDMARKET_ACCESS_TOKEN_SECRET); "
+                "cannot fetch CardMarket listings."
             )
-            for idx in range(1, 4)
-        ]
+
+        auth = OAuth1(
+            self.app_token,
+            self.app_secret,
+            self.access_token,
+            self.access_token_secret,
+        )
+        resp = requests.get(
+            f"{_CM_API_BASE}/products/find",
+            params={"search": card_name, "exact": 0, "onlyExact": 0, "maxResults": 5},
+            auth=auth,
+            timeout=10,
+        )
+        resp.raise_for_status()
+
+        listings: list[Listing] = []
+        for product in resp.json().get("product", []):
+            product_id = product.get("idProduct")
+            price_info = product.get("priceGuide", {})
+            market_price = price_info.get("SELL") or price_info.get("AVG1")
+            if market_price is None:
+                continue
+            listings.append(
+                Listing(
+                    source=self.source,
+                    card_name=card_name,
+                    price=float(market_price),
+                    currency="EUR",
+                    listing_id=f"cm-{product_id}",
+                    listing_url=f"https://www.cardmarket.com/en/Magic/Products/Singles/{product_id}",
+                    sold_count=int(price_info.get("TREND1") or 0),
+                )
+            )
+        return listings
