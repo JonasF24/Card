@@ -1,8 +1,8 @@
-# Card Tracker Pro - Investment Dashboard Documentation
+# Card Capital - Trading Card Investment Platform Documentation
 
 ## 📊 Overview
 
-**Card Tracker Pro** is a professional-grade investment dashboard designed specifically for traders and collectors investing in trading card games (TCGs) and sports cards. It provides real-time market tracking, portfolio management, and data-driven insights across 8 major markets.
+**Card Capital** is a professional-grade investment dashboard designed specifically for traders and collectors investing in trading card games (TCGs) and sports cards. It provides real-time market tracking, portfolio management, and data-driven insights across 8 major markets.
 
 ---
 
@@ -517,7 +517,7 @@ Dashboard use: Overall performance, market correlation
 
 ## 📄 License & Attribution
 
-**Card Tracker Pro** - Professional Trading Card Investment Dashboard
+**Card Capital** - Professional Trading Card Trading Card Investment Platform
 Created for card investors and traders worldwide
 
 ---

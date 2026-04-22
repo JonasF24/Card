@@ -1,4 +1,4 @@
-# Card Tracker Scraper
+# Card Capital Scraper
 
 Automated backend pipeline for collecting daily trading card market data from multiple sources and saving enriched results to Supabase.
 

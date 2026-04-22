@@ -85,11 +85,26 @@ const CardTrackerDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">CT</span>
+              <img
+                src="cardcapital-icon.png"
+                alt="Card Capital Icon"
+                className="w-10 h-10 rounded-lg object-contain sm:hidden"
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
+                }}
+              />
+              <img
+                src="cardcapital-logo.png"
+                alt="Card Capital - Trading Card Investing"
+                className="hidden sm:block h-12 w-auto object-contain"
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
+                }}
+              />
+              <div className="flex flex-col sm:hidden">
+                <h1 className="text-2xl font-bold text-white leading-tight">Card Capital</h1>
+                <span className="text-blue-300 text-xs font-semibold tracking-wide">Trading Card Investing</span>
               </div>
-              <h1 className="text-2xl font-bold text-white">Card Tracker Pro</h1>
-              <span className="ml-2 px-3 py-1 bg-blue-900/50 text-blue-300 text-xs font-semibold rounded-full">INVESTOR</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-400">
               <RefreshCw size={14} className="animate-spin" />

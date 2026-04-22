@@ -1,14 +1,31 @@
-# Complete System Guide
+# Card Capital - Complete System Guide
 
-This repository now includes:
-1. `card-tracker-dashboard.html` and `CardTracker.jsx` for frontend visualization.
-2. `card-tracker-scraper/` for backend ingestion, enrichment, and persistence.
+## System Overview
+Card Capital is a full-stack trading card investment platform with:
+1. **Frontend dashboard** (`card-tracker-dashboard.html`, `CardTracker.jsx`)
+2. **Backend pipeline** (`card-tracker-scraper/`)
+3. **Automation** (`.github/workflows/daily-scrape.yml`)
 
-## Integration flow
-1. Pipeline scrapes sources daily.
-2. Enrichment computes sentiment and score.
-3. Snapshots are persisted to Supabase.
-4. Frontend queries Supabase or a small API layer to render latest metrics.
+## Architecture
+1. Scrapers collect listings and market signals from eBay, TCGPlayer, CardMarket, and PSA.
+2. The enrichment layer adds Gemini-based sentiment and investment scoring.
+3. Supabase persists both raw listings and market snapshots.
+4. The dashboard consumes snapshot history for charts and market panels.
 
-## Suggested next step
-Add a lightweight API endpoint (FastAPI/Next.js API route) that returns the latest `market_snapshots` and historic series for charts.
+## Data Tracked
+- Average price
+- High/low range
+- Trading volume
+- Graded card counts
+- Market sentiment
+- Investment score
+- Trend window data
+
+## Deployment Path
+1. Configure environment variables from `.env.example`.
+2. Run pipeline locally with `python run_pipeline.py`.
+3. Set GitHub Actions secrets.
+4. Enable scheduled daily automation.
+
+## Recommended Extension
+Add a lightweight API layer (FastAPI or Next.js API routes) for dashboard querying, auth, and historical filtering.

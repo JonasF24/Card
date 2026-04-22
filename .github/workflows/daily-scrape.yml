@@ -1,4 +1,4 @@
-name: Daily Card Market Scrape
+name: Card Capital Daily Market Data
 
 on:
   schedule:

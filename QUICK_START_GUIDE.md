@@ -1,4 +1,4 @@
-# Card Tracker Pro - Quick Start Guide
+# Card Capital - Quick Start Guide
 
 ## 🚀 Getting Started in 5 Minutes
 
