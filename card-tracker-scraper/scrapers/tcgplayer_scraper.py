@@ -39,7 +39,8 @@ class TCGPlayerScraper(BaseScraper):
             )
 
         access_token = self._get_access_token()
-        headers = {"Authorization": f"bearer {access_token}"}
+        token_type = "Bearer"
+        headers = {"Authorization": f"{token_type} {access_token}"}
 
         search_resp = requests.get(
             f"{_TCGPLAYER_API_BASE}/catalog/products",
@@ -71,7 +72,7 @@ class TCGPlayerScraper(BaseScraper):
                         price=float(market_price),
                         listing_id=f"{product_id}-{sub_type}",
                         listing_url=f"https://www.tcgplayer.com/product/{product_id}",
-                        sold_count=int(price_info.get("lowQuantity") or 0),
+                        sold_count=0,
                     )
                 )
         return listings

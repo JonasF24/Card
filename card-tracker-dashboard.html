@@ -150,7 +150,7 @@
                 let s = seed;
                 return () => {
                     s = (s * 1664525 + 1013904223) & 0xffffffff;
-                    return (s >>> 0) / 0xffffffff;
+                    return (s >>> 0) / 0x100000000;
                 };
             };
 
@@ -506,7 +506,7 @@
                             e('div', { className: 'alert-box alert-green' },
                                 e('p', { className: 'text-green-200 text-sm font-semibold mb-1' }, '✓ Strong Performer'),
                                 e('p', { className: 'text-green-100 text-xs' },
-                                    `${bestPerformer.name} is the top-trending market at +${bestPerformer.trend}% over the selected period.`
+                                    `${bestPerformer.name} is the top-trending market at ${bestPerformer.trend > 0 ? '+' : ''}${bestPerformer.trend}% over the selected period.`
                                 )
                             ),
                             e('div', { className: 'alert-box alert-blue' },

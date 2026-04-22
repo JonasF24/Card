@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import quote_plus
 
 import requests
 from requests_oauthlib import OAuth1
@@ -9,6 +10,7 @@ from scrapers.base import BaseScraper
 from utils.models import Listing
 
 _CM_API_BASE = "https://api.cardmarket.com/ws/v2.0/output.json"
+_CM_SEARCH_URL = "https://www.cardmarket.com/en/Search"
 
 
 class CardMarketScraper(BaseScraper):
@@ -57,6 +59,8 @@ class CardMarketScraper(BaseScraper):
             market_price = price_info.get("SELL") or price_info.get("AVG1")
             if market_price is None:
                 continue
+            # Use a generic search URL so it works for any card game, not just Magic.
+            listing_url = f"{_CM_SEARCH_URL}?searchString={quote_plus(card_name)}"
             listings.append(
                 Listing(
                     source=self.source,
@@ -64,8 +68,8 @@ class CardMarketScraper(BaseScraper):
                     price=float(market_price),
                     currency="EUR",
                     listing_id=f"cm-{product_id}",
-                    listing_url=f"https://www.cardmarket.com/en/Magic/Products/Singles/{product_id}",
-                    sold_count=int(price_info.get("TREND1") or 0),
+                    listing_url=listing_url,
+                    sold_count=0,
                 )
             )
         return listings

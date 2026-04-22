@@ -81,12 +81,18 @@ class GeminiEnricher:
         else:
             sentiment, score = self._rule_based(avg_price)
 
+        # Derive snapshot currency from listings: if all listings share a
+        # non-default currency (e.g. EUR from CardMarket) use that; otherwise USD.
+        currencies = {entry.currency for entry in listings if entry.currency}
+        snapshot_currency = currencies.pop() if len(currencies) == 1 else "USD"
+
         return EnrichedSnapshot(
             source=source,
             card_name=card_name,
             avg_price=round(avg_price, 2),
             min_price=round(min_price, 2),
             max_price=round(max_price, 2),
+            currency=snapshot_currency,
             volume=volume,
             sentiment=sentiment,
             investment_score=round(score, 2),

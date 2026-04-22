@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import logging
 import re
+from urllib.parse import quote_plus
 
 import requests
 
 from scrapers.base import BaseScraper
 from utils.models import Listing
 
+logger = logging.getLogger(__name__)
+
 _PSA_POP_URL = "https://www.psacard.com/pop/search-results"
-_PSA_POP_API = "https://api.psacard.com/publicapi/pop/GetItems"
 
 
 class PSAScraper(BaseScraper):
@@ -18,8 +21,10 @@ class PSAScraper(BaseScraper):
         """Fetch PSA population report data for *card_name*.
 
         Queries the PSA population report search endpoint and parses the
-        total graded population count. Raises on network or parsing errors
-        so the pipeline can log and skip gracefully.
+        total graded population count. Raises on network errors so the
+        pipeline can log and skip gracefully. If the population count
+        cannot be parsed from the page, a warning is logged and
+        ``sold_count`` is set to 0.
         """
         headers = {
             "User-Agent": (
@@ -30,7 +35,7 @@ class PSAScraper(BaseScraper):
         }
         # PSA public pop-report search (returns JSON when Accept includes json)
         resp = requests.get(
-            "https://www.psacard.com/pop/search-results",
+            _PSA_POP_URL,
             params={"q": card_name},
             headers=headers,
             timeout=15,
@@ -48,6 +53,12 @@ class PSAScraper(BaseScraper):
             match = re.search(r'Total[^<]*?(\d[\d,]+)', resp.text)
         if match:
             total_pop = int(match.group(1).replace(",", ""))
+        else:
+            logger.warning(
+                "PSA pop-report: could not parse population count for %r; "
+                "returning sold_count=0.",
+                card_name,
+            )
 
         return [
             Listing(
@@ -55,7 +66,7 @@ class PSAScraper(BaseScraper):
                 card_name=card_name,
                 price=0.0,
                 listing_id=f"{card_name}-psa-pop",
-                listing_url=f"https://www.psacard.com/pop/search-results?q={card_name}",
+                listing_url=f"{_PSA_POP_URL}?q={quote_plus(card_name)}",
                 sold_count=total_pop,
             )
         ]
